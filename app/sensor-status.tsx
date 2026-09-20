@@ -1,11 +1,13 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { type RelativePathString, useRouter } from "expo-router";
 import { useState } from "react";
+import { useEffect } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenContainer } from "@/components/screen-container";
+import { subscribeToRainSensor, type RainSensorReading } from "@/lib/sensor-data";
 
 const COLORS = {
   green: "#006B3C",
@@ -85,6 +87,22 @@ export default function SensorStatusScreen() {
   const insets = useSafeAreaInsets();
   const [activeNav, setActiveNav] = useState("Home");
   const [lastUpdated, setLastUpdated] = useState("9:41 AM");
+  const [rainReading, setRainReading] = useState<RainSensorReading | null>(null);
+  const [sensorError, setSensorError] = useState(false);
+
+  useEffect(() => {
+    return subscribeToRainSensor(
+      "slope-01",
+      (reading) => {
+        setRainReading(reading);
+        setSensorError(false);
+        if (reading) {
+          setLastUpdated(new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
+        }
+      },
+      () => setSensorError(true),
+    );
+  }, []);
 
   const handleNavigation = (label: string) => {
     if (label === "Home") {
@@ -138,7 +156,17 @@ export default function SensorStatusScreen() {
             <Text style={styles.sectionTitle}>Live Sensor Readings</Text>
             <Text style={styles.updatedText}>Last updated: {lastUpdated}</Text>
           </View>
-          <View style={styles.sensorList}>{sensors.map((sensor) => <SensorCard key={sensor.name} sensor={sensor} />)}</View>
+          <View style={styles.sensorList}>
+            <SensorCard
+              sensor={{
+                ...sensors[0],
+                value: rainReading ? String(rainReading.rawValue) : "--",
+                unit: "raw",
+                detail: sensorError ? "Unavailable" : rainReading?.level ?? "Waiting",
+              }}
+            />
+            {sensors.slice(1).map((sensor) => <SensorCard key={sensor.name} sensor={sensor} />)}
+          </View>
 
           <View style={styles.aboutCard}>
             <MaterialIcons name="info-outline" size={16} color={COLORS.ink} />

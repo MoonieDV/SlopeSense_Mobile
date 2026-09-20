@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { Platform } from "react-native";
+import * as Notifications from "expo-notifications";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import {
@@ -19,6 +20,7 @@ import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
 import { trpc, createTRPCClient } from "@/lib/trpc";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
 import { GlobalBottomNavigation } from "@/components/global-bottom-navigation";
+import { RAIN_SENSOR_DEVICE_ID, formatRainfallLevel, getRainfallSeverity, isRainfallAlertLevel, subscribeToRainSensor, type RainSensorReading } from "@/lib/sensor-data";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -26,6 +28,17 @@ const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
 export const unstable_settings = {
   anchor: "(tabs)",
 };
+
+if (Platform.OS !== "web") {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+}
 
 export default function RootLayout() {
   const initialInsets = initialWindowMetrics?.insets ?? DEFAULT_WEB_INSETS;
@@ -49,6 +62,69 @@ export default function RootLayout() {
     const unsubscribe = subscribeSafeAreaInsets(handleSafeAreaUpdate);
     return () => unsubscribe();
   }, [handleSafeAreaUpdate]);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+
+    let previousAlertKey: string | null = null;
+    let previousSeverity = -1;
+    let isMounted = true;
+
+    const notifyForReading = async (reading: RainSensorReading) => {
+      const severe = isRainfallAlertLevel(reading.level);
+      const severity = getRainfallSeverity(reading.level);
+      const alertKey = `${reading.deviceId}-${reading.level.trim().toUpperCase()}`;
+      const isNewAlert = severe && alertKey !== previousAlertKey;
+      const isEscalating = severe && severity > previousSeverity;
+
+      if (!severe) {
+        previousAlertKey = null;
+        previousSeverity = -1;
+        return;
+      }
+
+      if (!isMounted || (!isNewAlert && !isEscalating)) {
+        previousSeverity = severity;
+        return;
+      }
+
+      previousAlertKey = alertKey;
+      previousSeverity = severity;
+
+      const permissions = await Notifications.getPermissionsAsync();
+      if (permissions.status !== "granted") {
+        const requested = await Notifications.requestPermissionsAsync();
+        if (requested.status !== "granted") return;
+      }
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Rainfall Alert",
+          body: `${formatRainfallLevel(reading.level)} detected near your area. Please remain alert.`,
+          data: { route: "/alerts-announcements" },
+          sound: "default",
+        },
+        trigger: Platform.OS === "android" ? { channelId: "rainfall-alerts" } : null,
+      });
+    };
+
+    if (Platform.OS === "android") {
+      void Notifications.setNotificationChannelAsync("rainfall-alerts", {
+        name: "Rainfall alerts",
+        importance: Notifications.AndroidImportance.HIGH,
+        sound: "default",
+      });
+    }
+
+    const unsubscribe = subscribeToRainSensor(RAIN_SENSOR_DEVICE_ID, (reading) => {
+      if (reading) void notifyForReading(reading);
+    }, () => undefined);
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
 
   // Create clients once and reuse them
   const [queryClient] = useState(
