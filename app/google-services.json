@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "444869040808",
+    "firebase_url": "https://slopesense-ec686-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "slopesense-ec686",
+    "storage_bucket": "slopesense-ec686.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:444869040808:android:356d8c667242d4c7b4009d",
+        "android_client_info": {
+          "package_name": "com.slope.sense"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDDytNYI1MZPC_hXjulB6J5I-GbIXXe8dA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
