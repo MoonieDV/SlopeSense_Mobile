@@ -1,7 +1,6 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { type RelativePathString, useRouter } from "expo-router";
-import { useState } from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

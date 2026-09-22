@@ -16,6 +16,7 @@ import { StatusBar } from "expo-status-bar";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { ScreenContainer } from "@/components/screen-container";
+import AnimatedWavyHeader from "@/components/AnimatedWavyHeader";
 import { type RelativePathString, useRouter } from "expo-router";
 import { getFirebaseAuthMessage, loginWithEmail } from "@/lib/firebase-auth";
 
@@ -82,18 +83,12 @@ export default function HomeScreen() {
   const passwordError = submitted && !password.trim();
 
   return (
-    <ScreenContainer edges={["top", "left", "right", "bottom"]} containerClassName="bg-white">
+    <ScreenContainer edges={["top", "left", "right", "bottom"]} containerClassName="bg-white" systemBarColor="#006F3F">
       <StatusBar style="light" />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <Animated.View style={[styles.hero, { opacity: heroOpacity, transform: [{ translateY: heroTranslate }] }]}>
-            <View style={styles.heroGlow} />
-            <View style={styles.brandRow}>
-              <MaterialIcons name="terrain" size={56} color="#FFFFFF" />
-              <Text style={styles.brandName}>SlopeSense</Text>
-            </View>
-            <View style={styles.waveBack} />
-            <View style={styles.waveFront} />
+            <AnimatedWavyHeader />
           </Animated.View>
 
           <Animated.View style={[styles.formShell, { opacity: contentOpacity, transform: [{ translateY: contentTranslate }] }]}>
@@ -180,13 +175,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   scrollContent: { flexGrow: 1, backgroundColor: "#FFFFFF", paddingBottom: 22 },
-  hero: { height: 205, backgroundColor: DEEP_GREEN, overflow: "hidden", position: "relative", justifyContent: "center", alignItems: "center" },
-  heroGlow: { position: "absolute", top: -80, left: -40, right: -40, height: 210, borderRadius: 160, backgroundColor: GREEN, opacity: 0.72 },
-  brandRow: { zIndex: 3, flexDirection: "row", alignItems: "center", gap: 9, marginTop: -12 },
-  brandMark: { width: 55, height: 55, tintColor: "#FFFFFF" },
-  brandName: { color: "#FFFFFF", fontSize: 22, fontWeight: "800", letterSpacing: -0.4 },
-  waveBack: { position: "absolute", left: -40, right: -40, bottom: -70, height: 132, borderRadius: 100, backgroundColor: "#F2F7F4", transform: [{ rotate: "-4deg" }] },
-  waveFront: { position: "absolute", left: -40, right: -40, bottom: -93, height: 142, borderRadius: 100, backgroundColor: "#FFFFFF", transform: [{ rotate: "-2deg" }] },
+  hero: { height: 205, backgroundColor: DEEP_GREEN, overflow: "hidden", position: "relative" },
   formShell: { flex: 1, paddingHorizontal: 25, alignItems: "center" },
   headingBlock: { alignItems: "center", marginTop: 6, marginBottom: 24 },
   title: { color: INK, fontSize: 21, lineHeight: 28, fontWeight: "800" },

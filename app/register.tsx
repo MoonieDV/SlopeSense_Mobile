@@ -78,7 +78,6 @@ export default function RegisterScreen() {
   const phoneRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
   const confirmRef = useRef<TextInput>(null);
-  const waveShift = useRef(new Animated.Value(0)).current;
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const contentTranslate = useRef(new Animated.Value(12)).current;
 
@@ -87,13 +86,7 @@ export default function RegisterScreen() {
       Animated.timing(contentOpacity, { toValue: 1, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       Animated.timing(contentTranslate, { toValue: 0, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
     ]).start();
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(waveShift, { toValue: 1, duration: 3600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(waveShift, { toValue: 0, duration: 3600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-    ]));
-    loop.start();
-    return () => loop.stop();
-  }, [contentOpacity, contentTranslate, waveShift]);
+  }, [contentOpacity, contentTranslate]);
 
   const tap = async (action?: () => void) => {
     if (Platform.OS !== "web") await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -122,28 +115,22 @@ export default function RegisterScreen() {
     }
   };
 
-  const xWave = waveShift.interpolate({ inputRange: [0, 1], outputRange: [0, 13] });
   const missing = (value: string) => submitted && !value.trim();
 
   return (
-    <ScreenContainer edges={["top", "left", "right", "bottom"]} containerClassName="bg-white">
+    <ScreenContainer edges={["top", "left", "right", "bottom"]} containerClassName="bg-white" systemBarColor={DEEP_GREEN}>
       <StatusBar style="light" />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={styles.hero}>
-            <View style={styles.heroGlow} />
             <View style={styles.headerRow}>
-              <Pressable onPress={() => tap(() => router.back())} hitSlop={10} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Go back">
-                <MaterialIcons name="arrow-back" size={21} color="#FFFFFF" />
-              </Pressable>
+              <View style={styles.headerSpacer} />
               <View style={styles.brandRow}>
                 <MaterialIcons name="terrain" size={36} color="#FFFFFF" />
                 <Text style={styles.brandName}>Create Account</Text>
               </View>
               <View style={styles.headerSpacer} />
             </View>
-            <Animated.View style={[styles.waveBack, { transform: [{ translateX: xWave }, { rotate: "-3deg" }] }]} />
-            <Animated.View style={[styles.waveFront, { transform: [{ translateX: Animated.multiply(xWave, -0.5) }, { rotate: "-1deg" }] }]} />
           </View>
 
           <Animated.View style={[styles.formShell, { opacity: contentOpacity, transform: [{ translateY: contentTranslate }] }]}>
@@ -185,15 +172,11 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   scrollContent: { flexGrow: 1, backgroundColor: "#FFFFFF", paddingBottom: 20 },
-  hero: { height: 92, backgroundColor: DEEP_GREEN, overflow: "hidden", position: "relative", justifyContent: "center" },
-  heroGlow: { position: "absolute", top: -58, left: -30, right: -30, height: 140, borderRadius: 100, backgroundColor: GREEN, opacity: 0.72 },
+  hero: { height: 92, backgroundColor: DEEP_GREEN, justifyContent: "center" },
   headerRow: { zIndex: 3, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, marginTop: -2 },
-  backButton: { width: 32, height: 38, justifyContent: "center" },
   brandRow: { flexDirection: "row", alignItems: "center", gap: 7 },
   brandName: { color: "#FFFFFF", fontSize: 14, fontWeight: "800", letterSpacing: -0.2 },
   headerSpacer: { width: 32 },
-  waveBack: { position: "absolute", left: -35, right: -35, bottom: -66, height: 104, borderRadius: 100, backgroundColor: "#F2F7F4" },
-  waveFront: { position: "absolute", left: -35, right: -35, bottom: -77, height: 106, borderRadius: 100, backgroundColor: "#FFFFFF" },
   formShell: { flex: 1, paddingHorizontal: 25, alignItems: "center" },
   introRow: { width: "100%", maxWidth: 420, flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginTop: 9, marginBottom: 5 },
   introCopy: { flex: 1 },

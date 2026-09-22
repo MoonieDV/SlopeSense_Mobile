@@ -38,12 +38,20 @@ const env = {
   androidPackage: bundleId,
 };
 
+const splash = {
+  image: "./assets/images/splash_screen.png",
+  imageWidth: 463,
+  resizeMode: "cover" as const,
+  backgroundColor: "#f8fbf8",
+};
+
 const config: ExpoConfig = {
   name: env.appName,
   slug: env.appSlug,
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
+  splash,
   scheme: env.scheme,
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
@@ -61,6 +69,7 @@ const config: ExpoConfig = {
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
+    splash,
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
@@ -105,12 +114,11 @@ const config: ExpoConfig = {
     [
       "expo-splash-screen",
       {
-        image: "./assets/images/splash-icon.png",
-        imageWidth: 200,
-        resizeMode: "contain",
-        backgroundColor: "#ffffff",
+        ...splash,
+        enableFullScreenImage_legacy: true,
         dark: {
-          backgroundColor: "#000000",
+          image: splash.image,
+          backgroundColor: splash.backgroundColor,
         },
       },
     ],
@@ -127,6 +135,22 @@ const config: ExpoConfig = {
   experiments: {
     typedRoutes: true,
     reactCompiler: true,
+  },
+  extra: {
+    firebase: {
+      apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? "AIzaSyDIpXGSAnpbEVy4BWivh9R18zdSERZ9Yjc",
+      authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? "slopesense-ec686.firebaseapp.com",
+      projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? "slopesense-ec686",
+      databaseURL:
+        process.env.EXPO_PUBLIC_FIREBASE_DATABASE_URL ??
+        "https://slopesense-ec686-default-rtdb.asia-southeast1.firebasedatabase.app",
+      storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ?? "slopesense-ec686.firebasestorage.app",
+      messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "444869040808",
+      appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID ?? "1:444869040808:web:6dd002efca264d25b4009d",
+    },
+    eas: {
+      projectId: "871463f4-6ec4-4613-b26b-034df419ad3c",
+    },
   },
 };
 

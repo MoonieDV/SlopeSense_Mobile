@@ -9,7 +9,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { firebaseAuth } from "@/lib/firebase";
 
 const colors = {
-  deepGreen: "#00552F",
+  deepGreen: "#004F2D",
   green: "#10804F",
   mint: "#E5F6EA",
   ink: "#17384A",
@@ -48,7 +48,7 @@ export default function DashboardScreen() {
   const goTo = (path: RelativePathString) => router.push(path);
 
   return (
-    <ScreenContainer edges={["top", "left", "right", "bottom"]} containerClassName="bg-[#F5FBF7]">
+    <ScreenContainer edges={["top", "left", "right", "bottom"]} containerClassName="bg-[#004F2D]">
       <StatusBar style="light" />
       <View style={styles.screen}>
         <Animated.View style={[styles.header, { opacity: sectionAnimations[0].opacity }]}>
@@ -56,7 +56,6 @@ export default function DashboardScreen() {
             <MaterialIcons name="terrain" size={42} color="#FFFFFF" />
             <View>
               <Text style={styles.brandName}>SlopeSense</Text>
-              <Text style={styles.tagline}>Safer Communities, Stronger Tomorrow</Text>
             </View>
           </View>
           <View style={styles.headerArtworkSpacer} />
@@ -162,8 +161,8 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F5FBF7" },
-  header: { backgroundColor: colors.deepGreen, minHeight: 82, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomLeftRadius: 22, borderBottomRightRadius: 22 },
-  brandBlock: { flexDirection: "row", alignItems: "center" },
+  header: { backgroundColor: colors.deepGreen, minHeight: 82, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  brandBlock: { flexDirection: "row", alignItems: "center", transform: [{ translateY: -4 }] },
   brandName: { color: "#FFFFFF", fontSize: 20, fontWeight: "800" },
   tagline: { color: "#D7F0E0", fontSize: 9, marginTop: 2 },
   headerArtworkSpacer: { width: 40, height: 40 },

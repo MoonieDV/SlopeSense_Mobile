@@ -1,4 +1,4 @@
-import { View, type ViewProps } from "react-native";
+import { StyleSheet, View, type ViewProps } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 
 import { cn } from "@/lib/utils";
@@ -21,6 +21,10 @@ export interface ScreenContainerProps extends ViewProps {
    * Additional className for the SafeAreaView (content layer).
    */
   safeAreaClassName?: string;
+  /**
+   * Background color behind the system status area.
+   */
+  systemBarColor?: string;
 }
 
 /**
@@ -44,6 +48,7 @@ export function ScreenContainer({
   className,
   containerClassName,
   safeAreaClassName,
+  systemBarColor = "#004F2D",
   style,
   ...props
 }: ScreenContainerProps) {
@@ -56,13 +61,21 @@ export function ScreenContainer({
       )}
       {...props}
     >
+      <View pointerEvents="none" style={[styles.systemBarBackdrop, { backgroundColor: systemBarColor }]} />
       <SafeAreaView
         edges={edges}
         className={cn("flex-1", safeAreaClassName)}
-        style={style}
+        style={[style, { backgroundColor: systemBarColor }]}
       >
         <View className={cn("flex-1", className)}>{children}</View>
       </SafeAreaView>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  systemBarBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#004F2D",
+  },
+});
