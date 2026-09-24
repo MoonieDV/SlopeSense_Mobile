@@ -1,6 +1,5 @@
 import { memo, useEffect, useMemo } from "react";
-import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import { Image, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import Svg, { Defs, LinearGradient, Path, Stop } from "react-native-svg";
 import Animated, {
   Easing,
@@ -74,7 +73,7 @@ function AnimatedWavyHeader({ height = 205, title = "SlopeSense" }: AnimatedWavy
       <View style={styles.glow} />
 
       <View style={styles.brandRow} pointerEvents="none">
-        <MaterialIcons name="terrain" size={56} color="#FFFFFF" />
+        <Image source={require("@/assets/images/logo_icon.png")} style={styles.brandIcon} resizeMode="contain" accessibilityLabel="SlopeSense mountain logo" />
         <Text style={styles.brandName}>{title}</Text>
       </View>
 
@@ -131,6 +130,10 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 22,
     fontWeight: "800",
+  },
+  brandIcon: {
+    width: 56,
+    height: 56,
   },
   waveLayer: {
     bottom: -1,

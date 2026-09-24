@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, Easing, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Animated, Easing, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -126,7 +126,7 @@ export default function RegisterScreen() {
             <View style={styles.headerRow}>
               <View style={styles.headerSpacer} />
               <View style={styles.brandRow}>
-                <MaterialIcons name="terrain" size={36} color="#FFFFFF" />
+                <Image source={require("@/assets/images/logo_icon.png")} style={styles.brandIcon} resizeMode="contain" accessibilityLabel="SlopeSense mountain logo" />
                 <Text style={styles.brandName}>Create Account</Text>
               </View>
               <View style={styles.headerSpacer} />
@@ -139,7 +139,7 @@ export default function RegisterScreen() {
                 <Text style={styles.title}>Create your Account</Text>
                 <Text style={styles.subtitle}>Fill in your details to get started.</Text>
               </View>
-              <View style={styles.mountainBadge}><MaterialIcons name="landscape" size={57} color={GREEN} /></View>
+              <Image source={require("@/assets/images/register_mountain_icon.png")} style={styles.mountainBadge} resizeMode="contain" accessibilityLabel="Register mountain illustration" />
             </View>
 
             <View style={styles.form}>
@@ -176,13 +176,14 @@ const styles = StyleSheet.create({
   headerRow: { zIndex: 3, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, marginTop: -2 },
   brandRow: { flexDirection: "row", alignItems: "center", gap: 7 },
   brandName: { color: "#FFFFFF", fontSize: 14, fontWeight: "800", letterSpacing: -0.2 },
+  brandIcon: { width: 36, height: 36 },
   headerSpacer: { width: 32 },
   formShell: { flex: 1, paddingHorizontal: 25, alignItems: "center" },
   introRow: { width: "100%", maxWidth: 420, flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginTop: 9, marginBottom: 5 },
   introCopy: { flex: 1 },
   title: { color: INK, fontSize: 15, lineHeight: 20, fontWeight: "800" },
   subtitle: { color: "#20242A", fontSize: 10, lineHeight: 14, marginTop: 1 },
-  mountainBadge: { width: 74, height: 49, alignItems: "center", justifyContent: "center", overflow: "hidden", marginTop: -5, marginRight: -7 },
+  mountainBadge: { width: 74, height: 49, marginTop: -5, marginRight: -7 },
   form: { width: "100%", maxWidth: 420 },
   fieldBlock: { marginBottom: 7 },
   fieldLabel: { color: INK, fontSize: 9, lineHeight: 12, fontWeight: "700", marginBottom: 3 },

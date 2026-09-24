@@ -6,6 +6,7 @@ import { type RelativePathString, useLocalSearchParams, useRouter } from "expo-r
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { requestPostAuthPermissions } from "@/lib/device-location";
 
 export default function OAuthCallback() {
   const router = useRouter();
@@ -21,6 +22,11 @@ export default function OAuthCallback() {
 
   useEffect(() => {
     const handleCallback = async () => {
+      const redirectToDashboard = async () => {
+        await requestPostAuthPermissions();
+        router.replace("/dashboard" as RelativePathString);
+      };
+
       console.log("[OAuth] Callback handler triggered");
       console.log("[OAuth] Params received:", {
         code: params.code,
@@ -61,9 +67,7 @@ export default function OAuthCallback() {
 
           setStatus("success");
           console.log("[OAuth] Web authentication successful, redirecting to home...");
-          setTimeout(() => {
-            router.replace("/dashboard" as RelativePathString);
-          }, 1000);
+          setTimeout(() => void redirectToDashboard(), 1000);
           return;
         }
 
@@ -158,9 +162,7 @@ export default function OAuthCallback() {
           // No need to fetch from API
           setStatus("success");
           console.log("[OAuth] Redirecting to home...");
-          setTimeout(() => {
-            router.replace("/dashboard" as RelativePathString);
-          }, 1000);
+          setTimeout(() => void redirectToDashboard(), 1000);
           return;
         }
 
@@ -215,7 +217,7 @@ export default function OAuthCallback() {
           // Redirect to home after a short delay
           setTimeout(() => {
             console.log("[OAuth] Executing redirect...");
-            router.replace("/dashboard" as RelativePathString);
+            void redirectToDashboard();
           }, 1000);
         } else {
           console.error("[OAuth] No session token in result:", result);

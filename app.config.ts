@@ -31,7 +31,7 @@ const env = {
   appName: "SlopeSense",
   appSlug: "slopesense-mobile",
   // S3 URL of the app logo - set this to the URL returned by generate_image when creating custom logo
-  // Leave empty to use the default icon from assets/images/icon.png
+  // App icon is configured below using the local app_icon.jpg asset.
   logoUrl: "/manus-storage/slopesense-icon_c6f1c62e.png",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
@@ -39,10 +39,10 @@ const env = {
 };
 
 const splash = {
-  image: "./assets/images/splash_screen.png",
-  imageWidth: 463,
-  resizeMode: "cover" as const,
-  backgroundColor: "#f8fbf8",
+  image: "./assets/images/mountain_icon.png",
+  imageWidth: 512,
+  resizeMode: "contain" as const,
+  backgroundColor: "#FFFFFF",
 };
 
 const config: ExpoConfig = {
@@ -50,7 +50,7 @@ const config: ExpoConfig = {
   slug: env.appSlug,
   version: "1.0.0",
   orientation: "portrait",
-  icon: "./assets/images/icon.png",
+  icon: "./assets/images/app_icon.jpg",
   splash,
   scheme: env.scheme,
   userInterfaceStyle: "automatic",
@@ -65,9 +65,7 @@ const config: ExpoConfig = {
   android: {
     adaptiveIcon: {
       backgroundColor: "#E6F4FE",
-      foregroundImage: "./assets/images/android-icon-foreground.png",
-      backgroundImage: "./assets/images/android-icon-background.png",
-      monochromeImage: "./assets/images/android-icon-monochrome.png",
+      foregroundImage: "./assets/images/app_icon.jpg",
     },
     splash,
     edgeToEdgeEnabled: true,
@@ -97,6 +95,12 @@ const config: ExpoConfig = {
     "expo-router",
     "expo-asset",
     "expo-font",
+    [
+      "expo-location",
+      {
+        locationWhenInUsePermission: "Allow SlopeSense to use your location for nearby safety information.",
+      },
+    ],
     "expo-web-browser",
     [
       "expo-audio",

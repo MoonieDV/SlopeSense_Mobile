@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { requestPostAuthPermissions } from "@/lib/device-location";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { ScreenContainer } from "@/components/screen-container";
@@ -71,6 +72,7 @@ export default function HomeScreen() {
     setIsLoading(true);
     try {
       await loginWithEmail(email, password);
+      await requestPostAuthPermissions();
       router.replace("/dashboard" as RelativePathString);
     } catch (error) {
       setMessage(getFirebaseAuthMessage(error));

@@ -1,12 +1,14 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
-import { Animated, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Animated, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { push, ref, serverTimestamp, set } from "firebase/database";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { useScreenEntrance } from "@/hooks/use-screen-entrance";
+import { firebaseAuth, firebaseDatabase } from "@/lib/firebase";
 
 const COLORS = {
   green: "#006B3C",
@@ -30,6 +32,7 @@ export default function ReportsScreen() {
   const [showPhotoOptions, setShowPhotoOptions] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const pickPhoto = async (source: "camera" | "gallery") => {
     setShowPhotoOptions(false);
@@ -44,8 +47,33 @@ export default function ReportsScreen() {
     setShowPhotoOptions(true);
   };
 
-  const handleSubmit = () => {
-    setSubmitted(true);
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+
+    const user = firebaseAuth.currentUser;
+    if (!user || !incidentType.trim() || !description.trim() || !location.trim()) {
+      Alert.alert("Incomplete report", "Select an incident type and enter a location and description.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const reportRef = push(ref(firebaseDatabase, "incidentReports"));
+      await set(reportRef, {
+        residentId: user.uid,
+        incidentType,
+        description,
+        location,
+        imageUrl: photoUri ?? "",
+        timestamp: serverTimestamp(),
+        status: "Pending",
+      });
+      setSubmitted(true);
+    } catch {
+      Alert.alert("Unable to submit report", "Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -110,7 +138,7 @@ export default function ReportsScreen() {
           {photoUri && <Pressable onPress={() => setPhotoUri(null)} style={styles.removePhotoButton} accessibilityRole="button" accessibilityLabel="Remove attached photo"><MaterialIcons name="close" size={14} color={COLORS.muted} /><Text style={styles.removePhotoText}>Remove photo</Text></Pressable>}
           <Text style={styles.fileHint}>JPG, PNG up to 5MB</Text>
 
-          <Pressable onPress={handleSubmit} style={({ pressed }) => [styles.submitButton, pressed && styles.submitPressed]} accessibilityRole="button" accessibilityLabel="Submit report">
+          <Pressable onPress={() => void handleSubmit()} disabled={isSubmitting} style={({ pressed }) => [styles.submitButton, pressed && styles.submitPressed, isSubmitting && styles.disabledButton]} accessibilityRole="button" accessibilityLabel="Submit report">
             <Text style={styles.submitText}>Submit Report</Text>
           </Pressable>
           {submitted && <Text style={styles.successText}>Your incident report is ready to be submitted.</Text>}
@@ -177,6 +205,7 @@ const styles = StyleSheet.create({
   fileHint: { color: COLORS.ink, fontSize: 10, marginBottom: 12 },
   submitButton: { height: 25, borderRadius: 6, backgroundColor: COLORS.green, alignItems: "center", justifyContent: "center" },
   submitPressed: { opacity: 0.75, transform: [{ scale: 0.985 }] },
+  disabledButton: { opacity: 0.55 },
   submitText: { color: COLORS.white, fontSize: 12, fontWeight: "700" },
   successText: { color: COLORS.green, fontSize: 10, textAlign: "center", marginTop: 7 },
   bottomNav: { height: 56, borderTopWidth: 1, borderTopColor: "#E4E7E5", flexDirection: "row", alignItems: "center", justifyContent: "space-around", backgroundColor: COLORS.white, shadowColor: "#000000", shadowOpacity: 0.06, shadowRadius: 5, shadowOffset: { width: 0, height: -2 }, elevation: 5 },
