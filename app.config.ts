@@ -71,6 +71,7 @@ const config: ExpoConfig = {
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
+    googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json",
     permissions: ["POST_NOTIFICATIONS"],
     intentFilters: [
       {
@@ -95,6 +96,7 @@ const config: ExpoConfig = {
     "expo-router",
     "expo-asset",
     "expo-font",
+    "expo-notifications",
     [
       "expo-location",
       {

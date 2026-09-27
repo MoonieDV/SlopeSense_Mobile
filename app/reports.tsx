@@ -1,13 +1,14 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { useState } from "react";
-import { Alert, Animated, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Animated, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { push, ref, serverTimestamp, set } from "firebase/database";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { useScreenEntrance } from "@/hooks/use-screen-entrance";
+import { getDeviceLocation, searchLocationSuggestions, type DeviceLocation } from "@/lib/device-location";
 import { firebaseAuth, firebaseDatabase } from "@/lib/firebase";
 
 const COLORS = {
@@ -33,6 +34,42 @@ export default function ReportsScreen() {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationSuggestions, setLocationSuggestions] = useState<DeviceLocation[]>([]);
+  const [isSearchingLocation, setIsSearchingLocation] = useState(false);
+  const skipNextLocationSearch = useRef(false);
+
+  useEffect(() => {
+    if (skipNextLocationSearch.current) {
+      skipNextLocationSearch.current = false;
+      return;
+    }
+
+    const query = location.trim();
+    if (query.length < 3) {
+      setLocationSuggestions([]);
+      setIsSearchingLocation(false);
+      return;
+    }
+
+    let active = true;
+    const timer = setTimeout(async () => {
+      setIsSearchingLocation(true);
+      try {
+        const suggestions = await searchLocationSuggestions(query);
+        if (active) setLocationSuggestions(suggestions);
+      } catch {
+        if (active) setLocationSuggestions([]);
+      } finally {
+        if (active) setIsSearchingLocation(false);
+      }
+    }, 450);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [location]);
 
   const pickPhoto = async (source: "camera" | "gallery") => {
     setShowPhotoOptions(false);
@@ -45,6 +82,30 @@ export default function ReportsScreen() {
 
   const choosePhotoSource = () => {
     setShowPhotoOptions(true);
+  };
+
+  const fillCurrentLocation = async () => {
+    if (isLocating) return;
+
+    setIsLocating(true);
+    try {
+      const currentLocation = await getDeviceLocation();
+      if (!currentLocation) {
+        Alert.alert(
+          "Location unavailable",
+          "Enable Location Services and allow SlopeSense to access your location, then try again.",
+        );
+        return;
+      }
+
+      skipNextLocationSearch.current = true;
+      setLocationSuggestions([]);
+      setLocation(currentLocation.label);
+    } catch {
+      Alert.alert("Unable to get location", "Check your GPS signal and try again.");
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -97,7 +158,7 @@ export default function ReportsScreen() {
           </View>
 
           <Text style={styles.label}>Incident Type</Text>
-          <View style={styles.selectWrap}>
+          <View style={[styles.selectWrap, showTypes && styles.selectWrapOpen]}>
             <Pressable onPress={() => setShowTypes((value) => !value)} style={styles.selectButton} accessibilityRole="button" accessibilityLabel="Select incident type">
               <Text style={[styles.selectText, !incidentType && styles.placeholderText]}>{incidentType || "Select incident type"}</Text>
               <MaterialIcons name={showTypes ? "keyboard-arrow-up" : "keyboard-arrow-down"} size={19} color={COLORS.ink} />
@@ -114,12 +175,49 @@ export default function ReportsScreen() {
           </View>
 
           <Text style={styles.label}>Location</Text>
-          <View style={styles.inputWrap}>
-            <MaterialIcons name="location-on" size={17} color={COLORS.ink} />
-            <TextInput value={location} onChangeText={setLocation} placeholder="Enter location" placeholderTextColor={COLORS.muted} style={styles.input} accessibilityLabel="Incident location" />
-            <Pressable onPress={() => setLocation("Current location")} hitSlop={8} accessibilityRole="button" accessibilityLabel="Use current location">
-              <MaterialIcons name="my-location" size={16} color={COLORS.ink} />
-            </Pressable>
+          <View style={styles.locationField}>
+            <View style={[styles.inputWrap, styles.locationInputWrap]}>
+              <MaterialIcons name="location-on" size={17} color={COLORS.ink} />
+              <TextInput
+                value={location}
+                onChangeText={(value) => {
+                  setLocationSuggestions([]);
+                  setLocation(value);
+                }}
+                placeholder="Enter location"
+                placeholderTextColor={COLORS.muted}
+                style={styles.input}
+                accessibilityLabel="Incident location"
+                autoCorrect={false}
+              />
+              <Pressable onPress={() => void fillCurrentLocation()} disabled={isLocating} hitSlop={8} style={styles.locationButton} accessibilityRole="button" accessibilityLabel="Use current GPS location">
+                {isLocating ? <ActivityIndicator size="small" color={COLORS.green} /> : <MaterialIcons name="my-location" size={19} color={COLORS.green} />}
+              </Pressable>
+            </View>
+            {isSearchingLocation && <View style={styles.locationSearchStatus}><ActivityIndicator size="small" color={COLORS.green} /><Text style={styles.locationSearchText}>Finding locations...</Text></View>}
+            {!isSearchingLocation && locationSuggestions.length > 0 && (
+              <View style={styles.locationSuggestions}>
+                {locationSuggestions.map((suggestion) => (
+                  <Pressable
+                    key={`${suggestion.latitude}-${suggestion.longitude}`}
+                    onPress={() => {
+                      skipNextLocationSearch.current = true;
+                      setLocation(suggestion.label);
+                      setLocationSuggestions([]);
+                    }}
+                    style={({ pressed }) => [styles.locationSuggestion, pressed && styles.pressed]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Use ${suggestion.label}`}
+                  >
+                    <MaterialIcons name="location-on" size={18} color={COLORS.green} />
+                    <Text numberOfLines={2} style={styles.locationSuggestionText}>{suggestion.label}</Text>
+                  </Pressable>
+                ))}
+                <Pressable onPress={() => void Linking.openURL("https://www.openstreetmap.org/copyright")} style={styles.locationAttribution} accessibilityRole="link">
+                  <Text style={styles.locationAttributionText}>© OpenStreetMap contributors</Text>
+                </Pressable>
+              </View>
+            )}
           </View>
 
           <View style={styles.descriptionHeading}>
@@ -131,11 +229,32 @@ export default function ReportsScreen() {
           </View>
 
           <Text style={styles.label}>Photo (Optional)</Text>
-          <Pressable onPress={choosePhotoSource} style={({ pressed }) => [styles.photoBox, pressed && styles.photoPressed]} accessibilityRole="button" accessibilityLabel={photoUri ? "Change attached photo" : "Tap to upload photo"}>
-            {photoUri ? <Image source={{ uri: photoUri }} style={styles.photoPreview} /> : <MaterialIcons name="photo-camera" size={26} color={COLORS.ink} />}
-            <Text style={styles.photoText}>{photoUri ? "Photo attached - tap to change" : "Tap to upload photo"}</Text>
-          </Pressable>
-          {photoUri && <Pressable onPress={() => setPhotoUri(null)} style={styles.removePhotoButton} accessibilityRole="button" accessibilityLabel="Remove attached photo"><MaterialIcons name="close" size={14} color={COLORS.muted} /><Text style={styles.removePhotoText}>Remove photo</Text></Pressable>}
+          {photoUri ? (
+            <View style={styles.photoPreviewCard}>
+              <Image source={{ uri: photoUri }} style={styles.photoPreview} resizeMode="cover" accessibilityLabel="Attached incident photo preview" />
+              <View style={styles.photoPreviewActions}>
+                <View style={styles.photoAttachedLabel}>
+                  <MaterialIcons name="check-circle" size={17} color={COLORS.green} />
+                  <Text style={styles.photoAttachedText}>Photo attached</Text>
+                </View>
+                <View style={styles.photoActionButtons}>
+                  <Pressable onPress={choosePhotoSource} style={({ pressed }) => [styles.photoActionButton, pressed && styles.photoPressed]} accessibilityRole="button" accessibilityLabel="Change attached photo">
+                    <MaterialIcons name="photo-camera" size={17} color={COLORS.green} />
+                    <Text style={styles.changePhotoText}>Change</Text>
+                  </Pressable>
+                  <Pressable onPress={() => setPhotoUri(null)} style={({ pressed }) => [styles.removePhotoButton, pressed && styles.photoPressed]} accessibilityRole="button" accessibilityLabel="Remove attached photo">
+                    <MaterialIcons name="delete-outline" size={18} color="#B42318" />
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          ) : (
+            <Pressable onPress={choosePhotoSource} style={({ pressed }) => [styles.photoBox, pressed && styles.photoPressed]} accessibilityRole="button" accessibilityLabel="Upload an incident photo">
+              <View style={styles.photoIcon}><MaterialIcons name="photo-camera" size={27} color={COLORS.green} /></View>
+              <Text style={styles.photoText}>Add a photo</Text>
+              <Text style={styles.photoHint}>Take a photo or choose from your gallery</Text>
+            </Pressable>
+          )}
           <Text style={styles.fileHint}>JPG, PNG up to 5MB</Text>
 
           <Pressable onPress={() => void handleSubmit()} disabled={isSubmitting} style={({ pressed }) => [styles.submitButton, pressed && styles.submitPressed, isSubmitting && styles.disabledButton]} accessibilityRole="button" accessibilityLabel="Submit report">
@@ -174,26 +293,45 @@ const styles = StyleSheet.create({
   noticeCopy: { flex: 1, marginLeft: 11 },
   noticeTitle: { color: COLORS.ink, fontSize: 13, fontWeight: "800" },
   noticeText: { color: COLORS.ink, fontSize: 11, lineHeight: 15, marginTop: 3 },
-  label: { color: COLORS.ink, fontSize: 11, fontWeight: "700", marginBottom: 5 },
-  selectWrap: { zIndex: 2, marginBottom: 11 },
-  selectButton: { height: 29, borderWidth: 1, borderColor: "#D5DADF", borderRadius: 6, paddingHorizontal: 9, alignItems: "center", justifyContent: "space-between", flexDirection: "row" },
-  selectText: { color: COLORS.ink, fontSize: 11 },
+  label: { color: COLORS.ink, fontSize: 12, fontWeight: "700", marginBottom: 6 },
+  selectWrap: { zIndex: 2, marginBottom: 14 },
+  selectWrapOpen: { zIndex: 50, elevation: 20 },
+  selectButton: { height: 44, borderWidth: 1, borderColor: "#D5DADF", borderRadius: 7, paddingHorizontal: 12, alignItems: "center", justifyContent: "space-between", flexDirection: "row" },
+  selectText: { color: COLORS.ink, fontSize: 12 },
   placeholderText: { color: COLORS.muted },
-  optionList: { position: "absolute", top: 32, left: 0, right: 0, backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, borderRadius: 6, shadowColor: "#000000", shadowOpacity: 0.12, shadowRadius: 5, elevation: 4 },
-  option: { height: 27, justifyContent: "center", paddingHorizontal: 10 },
-  optionText: { color: COLORS.ink, fontSize: 11 },
-  inputWrap: { height: 29, borderWidth: 1, borderColor: "#D5DADF", borderRadius: 6, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", marginBottom: 11 },
-  input: { flex: 1, color: COLORS.ink, fontSize: 11, marginLeft: 7, paddingVertical: 0 },
+  optionList: { position: "absolute", top: 47, left: 0, right: 0, zIndex: 60, backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, borderRadius: 7, shadowColor: "#000000", shadowOpacity: 0.12, shadowRadius: 5, elevation: 24 },
+  option: { minHeight: 40, justifyContent: "center", paddingHorizontal: 12 },
+  optionText: { color: COLORS.ink, fontSize: 12 },
+  inputWrap: { height: 44, borderWidth: 1, borderColor: "#D5DADF", borderRadius: 7, paddingHorizontal: 11, flexDirection: "row", alignItems: "center", marginBottom: 14 },
+  input: { flex: 1, color: COLORS.ink, fontSize: 12, marginLeft: 8, paddingVertical: 0 },
+  locationField: { marginBottom: 14, zIndex: 10 },
+  locationInputWrap: { marginBottom: 0, zIndex: 2, backgroundColor: COLORS.white },
+  locationButton: { width: 34, height: 34, alignItems: "center", justifyContent: "center" },
+  locationSearchStatus: { position: "absolute", top: 44, left: 0, right: 0, minHeight: 40, zIndex: 20, elevation: 8, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 11, backgroundColor: COLORS.white, borderWidth: 1, borderTopWidth: 0, borderColor: COLORS.border, borderBottomLeftRadius: 7, borderBottomRightRadius: 7 },
+  locationSearchText: { color: COLORS.muted, fontSize: 10 },
+  locationSuggestions: { position: "absolute", top: 44, left: 0, right: 0, zIndex: 20, elevation: 8, maxHeight: 244, borderWidth: 1, borderTopWidth: 0, borderColor: COLORS.border, borderBottomLeftRadius: 7, borderBottomRightRadius: 7, overflow: "hidden", backgroundColor: COLORS.white, shadowColor: "#000000", shadowOpacity: 0.14, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
+  locationSuggestion: { minHeight: 44, paddingHorizontal: 11, paddingVertical: 8, flexDirection: "row", alignItems: "center", gap: 9, borderTopWidth: 1, borderTopColor: "#EEF1EF" },
+  locationSuggestionText: { flex: 1, color: COLORS.ink, fontSize: 11, lineHeight: 15 },
+  locationAttribution: { alignSelf: "stretch", alignItems: "flex-end", paddingVertical: 4, paddingHorizontal: 8, borderTopWidth: 1, borderTopColor: "#EEF1EF" },
+  locationAttributionText: { color: COLORS.muted, fontSize: 8 },
   descriptionHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   counter: { color: COLORS.ink, fontSize: 10, marginBottom: 5 },
-  descriptionWrap: { height: 70, borderWidth: 1, borderColor: "#D5DADF", borderRadius: 6, marginBottom: 11 },
-  descriptionInput: { flex: 1, color: COLORS.ink, fontSize: 11, paddingHorizontal: 9, paddingTop: 8 },
-  photoBox: { height: 54, borderWidth: 1, borderStyle: "dashed", borderColor: "#CBD1D6", borderRadius: 6, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  descriptionWrap: { height: 108, borderWidth: 1, borderColor: "#D5DADF", borderRadius: 7, marginBottom: 14 },
+  descriptionInput: { flex: 1, color: COLORS.ink, fontSize: 12, lineHeight: 17, paddingHorizontal: 11, paddingTop: 10 },
+  photoBox: { minHeight: 104, borderWidth: 1, borderStyle: "dashed", borderColor: "#BFCBC5", borderRadius: 8, backgroundColor: "#FAFCFB", alignItems: "center", justifyContent: "center", paddingVertical: 14 },
   photoPressed: { opacity: 0.62 },
-  photoPreview: { width: 38, height: 34, borderRadius: 4, marginBottom: 3 },
-  photoText: { color: COLORS.ink, fontSize: 11, marginTop: 3 },
-  removePhotoButton: { alignSelf: "flex-end", flexDirection: "row", alignItems: "center", gap: 3, marginTop: 1, marginBottom: 3 },
-  removePhotoText: { color: COLORS.muted, fontSize: 10 },
+  photoIcon: { width: 42, height: 42, borderRadius: 21, backgroundColor: COLORS.paleGreen, alignItems: "center", justifyContent: "center" },
+  photoText: { color: COLORS.ink, fontSize: 12, fontWeight: "700", marginTop: 7 },
+  photoHint: { color: COLORS.muted, fontSize: 10, marginTop: 2 },
+  photoPreviewCard: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, overflow: "hidden", backgroundColor: COLORS.white },
+  photoPreview: { width: "100%", aspectRatio: 16 / 9, backgroundColor: COLORS.paleGreen },
+  photoPreviewActions: { minHeight: 48, paddingHorizontal: 11, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  photoAttachedLabel: { flexDirection: "row", alignItems: "center", gap: 6 },
+  photoAttachedText: { color: COLORS.ink, fontSize: 11, fontWeight: "700" },
+  photoActionButtons: { flexDirection: "row", alignItems: "center", gap: 6 },
+  photoActionButton: { minHeight: 34, paddingHorizontal: 9, borderRadius: 6, backgroundColor: COLORS.paleGreen, flexDirection: "row", alignItems: "center", gap: 5 },
+  changePhotoText: { color: COLORS.green, fontSize: 11, fontWeight: "700" },
+  removePhotoButton: { width: 34, height: 34, borderRadius: 6, backgroundColor: "#FFF1F0", alignItems: "center", justifyContent: "center" },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.45)", justifyContent: "flex-end" },
   photoOptionsCard: { backgroundColor: COLORS.white, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: 22, paddingBottom: 30 },
   photoOptionsTitle: { color: COLORS.ink, fontSize: 16, fontWeight: "800" },
@@ -202,8 +340,8 @@ const styles = StyleSheet.create({
   photoOptionText: { color: COLORS.ink, fontSize: 13, fontWeight: "700", marginLeft: 11 },
   cancelButton: { alignItems: "center", paddingVertical: 11, marginTop: 2 },
   cancelText: { color: COLORS.muted, fontSize: 13, fontWeight: "700" },
-  fileHint: { color: COLORS.ink, fontSize: 10, marginBottom: 12 },
-  submitButton: { height: 25, borderRadius: 6, backgroundColor: COLORS.green, alignItems: "center", justifyContent: "center" },
+  fileHint: { color: COLORS.muted, fontSize: 10, marginTop: 5, marginBottom: 14 },
+  submitButton: { height: 44, borderRadius: 7, backgroundColor: COLORS.green, alignItems: "center", justifyContent: "center" },
   submitPressed: { opacity: 0.75, transform: [{ scale: 0.985 }] },
   disabledButton: { opacity: 0.55 },
   submitText: { color: COLORS.white, fontSize: 12, fontWeight: "700" },

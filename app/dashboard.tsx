@@ -7,6 +7,7 @@ import { Animated, Easing, Image, Pressable, StyleSheet, Text, View, useWindowDi
 
 import { ScreenContainer } from "@/components/screen-container";
 import { firebaseAuth } from "@/lib/firebase";
+import { formatAnnouncementDate, subscribeToAnnouncements, type Announcement } from "@/lib/firebase-announcements";
 
 const colors = {
   green: "#006B3C",
@@ -96,9 +97,9 @@ function UpdateCard({
         <MaterialIcons name={icon} size={35} color={iconColor} />
       </View>
       <View style={styles.updateCopy}>
-        <Text style={styles.updateTitle}>{title}</Text>
-        <Text style={styles.updateTime}>{time}</Text>
-        <Text style={styles.updateBody}>{body}</Text>
+        <Text numberOfLines={1} ellipsizeMode="tail" style={styles.updateTitle}>{title}</Text>
+        <Text numberOfLines={1} ellipsizeMode="tail" style={styles.updateTime}>{time}</Text>
+        <Text numberOfLines={2} ellipsizeMode="tail" style={styles.updateBody}>{body}</Text>
       </View>
     </View>
   );
@@ -109,6 +110,8 @@ export default function DashboardScreen() {
   const { width } = useWindowDimensions();
   const isNarrow = width < 380;
   const [displayName, setDisplayName] = useState(firebaseAuth.currentUser?.displayName?.trim() || "Juan Dela Cruz");
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [announcementsLoaded, setAnnouncementsLoaded] = useState(false);
   const sectionAnimations = useRef(
     Array.from({ length: 5 }, () => ({ opacity: new Animated.Value(0), y: new Animated.Value(14) })),
   ).current;
@@ -120,6 +123,14 @@ export default function DashboardScreen() {
 
     return unsubscribe;
   }, []);
+
+  useEffect(() => subscribeToAnnouncements(
+    (items) => {
+      setAnnouncements(items);
+      setAnnouncementsLoaded(true);
+    },
+    () => setAnnouncementsLoaded(true),
+  ), []);
 
   useEffect(() => {
     sectionAnimations.forEach(({ opacity, y }, index) => {
@@ -224,26 +235,24 @@ export default function DashboardScreen() {
                 <MaterialIcons name="chevron-right" size={18} color={colors.green} />
               </Pressable>
             </View>
-            <UpdateCard
-              featured
-              icon="campaign"
-              iconColor={colors.amber}
-              iconBackground="#FFF6DA"
-              title="Community Drill"
-              time="May 30, 2025 - 8:00 AM"
-              body="A community evacuation drill will be conducted on May 30, 2025 at 8:00 AM."
-            />
-          </Animated.View>
-
-          <Animated.View style={{ opacity: sectionAnimations[4].opacity, transform: [{ translateY: sectionAnimations[4].y }] }}>
-            <UpdateCard
-              icon="assignment"
-              iconColor={colors.green}
-              iconBackground={colors.lightGreen}
-              title="Safety Reminder"
-              time="May 28, 2025"
-              body="Avoid staying near slopes during heavy rain. Keep your family safe."
-            />
+            {announcements.slice(0, 2).map((announcement, index) => (
+              <UpdateCard
+                key={announcement.id}
+                featured={index === 0}
+                icon="campaign"
+                iconColor={index === 0 ? colors.amber : colors.green}
+                iconBackground={index === 0 ? "#FFF6DA" : colors.lightGreen}
+                title={announcement.title}
+                time={formatAnnouncementDate(announcement.timestamp)}
+                body={announcement.body}
+              />
+            ))}
+            {announcementsLoaded && announcements.length === 0 && (
+              <View style={styles.emptyUpdates}>
+                <MaterialIcons name="campaign" size={24} color={colors.muted} />
+                <Text style={styles.emptyUpdatesText}>No announcements available.</Text>
+              </View>
+            )}
           </Animated.View>
         </Animated.ScrollView>
       </View>
@@ -349,7 +358,7 @@ const styles = StyleSheet.create({
   viewAllButton: { flexDirection: "row", alignItems: "center", paddingLeft: 10, paddingVertical: 4 },
   viewAllText: { color: colors.green, fontSize: 10, fontWeight: "800", marginRight: 2 },
   updateCard: {
-    minHeight: 90,
+    height: 96,
     borderRadius: 11,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
@@ -370,5 +379,7 @@ const styles = StyleSheet.create({
   updateTitle: { color: colors.ink, fontSize: 13, lineHeight: 17, fontWeight: "800" },
   updateTime: { color: colors.muted, fontSize: 10, lineHeight: 14, marginTop: 1 },
   updateBody: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 2 },
+  emptyUpdates: { minHeight: 68, borderWidth: 1, borderColor: colors.border, borderRadius: 8, alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "#FFFFFF" },
+  emptyUpdatesText: { color: colors.muted, fontSize: 11 },
   pressed: { opacity: 0.72, transform: [{ scale: 0.99 }] },
 });

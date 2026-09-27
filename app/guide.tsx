@@ -1,4 +1,5 @@
 import { MaterialIcons } from "@expo/vector-icons";
+import { type RelativePathString, useRouter } from "expo-router";
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 
@@ -27,6 +28,7 @@ const guideItems: GuideItem[] = [
 
 export default function GuideScreen() {
   const entranceStyle = useScreenEntrance();
+  const router = useRouter();
 
   return (
     <ScreenContainer edges={["top", "left", "right", "bottom"]} containerClassName="bg-white">
@@ -42,7 +44,15 @@ export default function GuideScreen() {
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.guideList}>
             {guideItems.map((item) => (
-              <Pressable key={item.title} style={({ pressed }) => [styles.guideRow, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel={item.title}>
+              <Pressable
+                key={item.title}
+                onPress={() => {
+                  if (item.title === "Before a Landslide") router.push("/before-landslide" as RelativePathString);
+                }}
+                style={({ pressed }) => [styles.guideRow, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel={item.title}
+              >
                 <View style={styles.guideIcon}><MaterialIcons name={item.icon} size={25} color={colors.green} /></View>
                 <View style={styles.guideCopy}>
                   <Text style={styles.guideTitle}>{item.title}</Text>
