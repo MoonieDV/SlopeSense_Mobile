@@ -61,7 +61,7 @@ export default function BeforeLandslideScreen() {
       <StatusBar style="light" />
       <View style={styles.screen}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Go back">
+          <Pressable onPress={() => router.replace("/guide" as any)} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Go back">
             <MaterialIcons name="arrow-back" size={24} color="#FFFFFF" />
           </Pressable>
           <Text style={styles.headerTitle}>Preparedness Guide</Text>
@@ -212,3 +212,4 @@ const styles = StyleSheet.create({
   activeDot: { backgroundColor: colors.green },
   pressed: { opacity: 0.7 },
 });
+

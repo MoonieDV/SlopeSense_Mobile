@@ -41,7 +41,13 @@ export default function ProfileScreen() {
   }, []);
 
   const logout = async () => {
-    try { await signOut(firebaseAuth); router.replace("/" as RelativePathString); } catch { setMessage("Unable to log out right now."); }
+    try {
+      await signOut(firebaseAuth);
+      router.dismissAll();
+      router.replace("/" as RelativePathString);
+    } catch {
+      setMessage("Unable to log out right now.");
+    }
   };
 
   return (

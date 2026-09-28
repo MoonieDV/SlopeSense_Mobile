@@ -165,7 +165,7 @@ export default function DashboardScreen() {
       <View style={styles.screen}>
         <Animated.View style={[styles.header, { opacity: sectionAnimations[0].opacity }]}>
           <View style={styles.brandBlock}>
-            <MaterialIcons name="terrain" size={42} color="#FFFFFF" />
+            <Image source={require("@/assets/images/logo_icon.png")} style={styles.brandLogo} resizeMode="contain" accessibilityLabel="SlopeSense logo" />
             <Text style={styles.brandName}>SlopeSense</Text>
           </View>
           <View style={styles.headerArtworkSpacer} />
@@ -273,6 +273,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   brandBlock: { flexDirection: "row", alignItems: "center", transform: [{ translateY: -4 }] },
+  brandLogo: { width: 36, height: 36, marginRight: 8 },
   brandName: { color: "#FFFFFF", fontSize: 15, fontWeight: "800" },
   headerArtworkSpacer: { width: 40, height: 40 },
   scrollContent: { width: "100%", maxWidth: 430, alignSelf: "center", paddingTop: 0, paddingBottom: 104 },

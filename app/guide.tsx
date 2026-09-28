@@ -47,7 +47,11 @@ export default function GuideScreen() {
               <Pressable
                 key={item.title}
                 onPress={() => {
-                  if (item.title === "Before a Landslide") router.push("/before-landslide" as RelativePathString);
+                  if (item.title === "Before a Landslide") router.replace("/before-landslide" as RelativePathString);
+                  if (item.title === "During a Landslide") router.replace("/during-landslide" as RelativePathString);
+                  if (item.title === "After a Landslide") router.replace("/after-landslide" as RelativePathString);
+                  if (item.title === "Emergency Contacts") router.replace("/emergency-contacts" as RelativePathString);
+                  if (item.title === "Safety Tips") router.replace("/safety-tips" as RelativePathString);
                 }}
                 style={({ pressed }) => [styles.guideRow, pressed && styles.pressed]}
                 accessibilityRole="button"
