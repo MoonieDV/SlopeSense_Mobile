@@ -60,3 +60,17 @@ export function subscribeToRainSensor(
     (error) => onError(error),
   );
 }
+
+export function subscribeToSensor(
+  deviceId: string,
+  onReading: (reading: unknown) => void,
+  onError: (error: Error) => void,
+) {
+  return onValue(
+    ref(firebaseDatabase, `sensors/${deviceId}/latest`),
+    (snapshot) => {
+      onReading(snapshot.exists() ? snapshot.val() : null);
+    },
+    (error) => onError(error),
+  );
+}

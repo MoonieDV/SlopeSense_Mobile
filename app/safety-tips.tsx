@@ -1,6 +1,7 @@
+import { useEffect } from 'react';
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Animated, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, Image, Pressable, ScrollView, StyleSheet, Text, View, BackHandler } from "react-native";
 import { StatusBar } from "expo-status-bar";
 
 import { ScreenContainer } from "@/components/screen-container";
@@ -52,6 +53,7 @@ const tips: Tip[] = [
 
 export default function SafetyTipsScreen() {
   const router = useRouter();
+  useEffect(() => { const sub = BackHandler.addEventListener('hardwareBackPress', () => { router.replace('/guide' as any); return true; }); return () => sub.remove(); }, [router]);
   const entranceStyle = useScreenEntrance();
 
   return (
@@ -211,4 +213,8 @@ const styles = StyleSheet.create({
 
   pressed: { opacity: 0.7 },
 });
+
+
+
+
 

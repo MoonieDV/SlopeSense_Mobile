@@ -1,7 +1,10 @@
 import {
   createUserWithEmailAndPassword,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  updatePassword,
   updateProfile,
 } from "firebase/auth";
 import { get, ref, set, update } from "firebase/database";
@@ -13,6 +16,7 @@ export type UserProfile = {
   displayName: string;
   phone: string;
   address: string;
+  photoURL?: string;
   createdAt?: string;
 };
 
@@ -60,25 +64,39 @@ export async function sendPasswordReset(email: string) {
   await sendPasswordResetEmail(firebaseAuth, email.trim());
 }
 
+export async function changeCurrentUserPassword(currentPassword: string, newPassword: string) {
+  const user = firebaseAuth.currentUser;
+  if (!user?.email) {
+    throw new Error("No email/password user is currently signed in.");
+  }
+
+  const credential = EmailAuthProvider.credential(user.email, currentPassword);
+  await reauthenticateWithCredential(user, credential);
+  await updatePassword(user, newPassword);
+}
+
 export async function updateUserProfile({
   uid,
   displayName,
   phone,
   address,
+  photoURL,
 }: {
   uid: string;
   displayName: string;
   phone: string;
   address: string;
+  photoURL?: string;
 }) {
   if (firebaseAuth.currentUser) {
-    await updateProfile(firebaseAuth.currentUser, { displayName });
+    await updateProfile(firebaseAuth.currentUser, { displayName, ...(photoURL !== undefined ? { photoURL } : {}) });
   }
 
   await update(ref(firebaseDatabase, `users/${uid}`), {
     displayName,
     phone,
     address,
+    ...(photoURL !== undefined ? { photoURL } : {}),
     updatedAt: new Date().toISOString(),
   });
 }
@@ -90,6 +108,8 @@ export function getFirebaseAuthMessage(error: unknown): string {
       : "";
 
   switch (code) {
+    case "profile/photo-read-failed":
+      return "The selected photo could not be read. Choose another photo and try again.";
     case "auth/email-already-in-use":
       return "An account with this email already exists.";
     case "auth/invalid-credential":
@@ -98,6 +118,10 @@ export function getFirebaseAuthMessage(error: unknown): string {
       return "The email or password is incorrect.";
     case "auth/weak-password":
       return "Use a password with at least 6 characters.";
+    case "auth/requires-recent-login":
+      return "For your security, enter your current password and try again.";
+    case "auth/too-many-requests":
+      return "Too many attempts. Please wait a moment and try again.";
     case "auth/invalid-email":
       return "Enter a valid email address.";
     case "auth/network-request-failed":
@@ -110,4 +134,17 @@ export function getFirebaseAuthMessage(error: unknown): string {
     default:
       return "Something went wrong. Check your Firebase setup and try again.";
   }
+}
+
+export function getChangePasswordMessage(error: unknown): string {
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? String(error.code)
+      : "";
+
+  if (["auth/invalid-credential", "auth/wrong-password"].includes(code)) {
+    return "Your current password is incorrect.";
+  }
+
+  return getFirebaseAuthMessage(error);
 }

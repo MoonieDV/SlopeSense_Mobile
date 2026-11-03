@@ -2,12 +2,14 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { type RelativePathString, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { onAuthStateChanged } from "firebase/auth";
-import { useEffect, useRef, useState } from "react";
-import { Animated, Easing, Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Easing, Image, PanResponder, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
 import { ScreenContainer } from "@/components/screen-container";
+import { getSensorTimestamp, interpretResidentCondition, type ResidentCondition, type SensorReading, type SensorType } from "@/lib/current-conditions";
 import { firebaseAuth } from "@/lib/firebase";
 import { formatAnnouncementDate, subscribeToAnnouncements, type Announcement } from "@/lib/firebase-announcements";
+import { subscribeToSensor } from "@/lib/sensor-data";
 
 const colors = {
   green: "#006B3C",
@@ -22,19 +24,213 @@ const colors = {
 
 type IconName = keyof typeof MaterialIcons.glyphMap;
 
-function RainIcon() {
+const SENSORS = [
+  { id: "slope-01", type: "rainfall" as SensorType },
+  { id: "soilSensor", type: "soilMoisture" as SensorType },
+  { id: "tiltSensor", type: "tilt" as SensorType },
+  { id: "vibrationSensor", type: "vibration" as SensorType },
+];
+
+const CONDITION_ICONS: Record<SensorType, IconName> = {
+  rainfall: "cloud",
+  soilMoisture: "grass",
+  tilt: "terrain",
+  vibration: "vibration",
+};
+
+const SEVERITY_COLORS = {
+  normal: { accent: colors.green, pale: "#E4F1EA", border: colors.border },
+  caution: { accent: "#D69E00", pale: "#FFF6DA", border: "#F3D98B" },
+  warning: { accent: "#D97706", pale: "#FFF3E0", border: "#F4C277" },
+  danger: { accent: "#C62828", pale: "#FDECEC", border: "#F2B8B8" },
+};
+
+function formatConditionTime(timestamp: number) {
+  return new Date(timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+type DisplayCondition = {
+  key: string;
+  icon: IconName;
+  title: string;
+  message: string;
+  severity: keyof typeof SEVERITY_COLORS;
+  timestamp?: number;
+};
+
+function SensorCardDeck({ readings, loaded }: { readings: Record<string, SensorReading | null>; loaded: boolean }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const swipeX = useRef(new Animated.Value(0)).current;
+  const swipeY = useRef(new Animated.Value(0)).current;
+  const autoPlayTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const animateSwipeRef = useRef<(direction: -1 | 1, resumeAfter?: boolean) => void>(() => {});
+  const scheduleAutoPlayRef = useRef<() => void>(() => {});
+  const conditions = useMemo(() => SENSORS
+      .map((sensor) => interpretResidentCondition(sensor.type, readings[sensor.id]))
+      .filter((condition): condition is ResidentCondition => condition !== null),
+    [readings],
+  );
+  const cards = useMemo<DisplayCondition[]>(() => {
+    if (!loaded) {
+      return [{
+        key: "loading",
+        icon: "sync",
+        title: "Checking Current Conditions",
+        message: "Getting the latest updates for your area.",
+        severity: "normal",
+      }];
+    }
+
+    if (conditions.length === 0) {
+      const timestamps = Object.values(readings)
+        .filter((reading): reading is SensorReading => Boolean(reading))
+        .map(getSensorTimestamp);
+      return [{
+        key: "normal",
+        icon: "check-circle",
+        title: "Conditions are Normal",
+        message: "No unusual conditions have been detected in your area.",
+        severity: "normal",
+        timestamp: timestamps.length > 0 ? Math.max(...timestamps) : Date.now(),
+      }];
+    }
+
+    return conditions.map((condition) => ({
+      key: condition.sensorType,
+      icon: CONDITION_ICONS[condition.sensorType],
+      title: condition.title,
+      message: `${condition.message} ${condition.advice}`,
+      severity: condition.severity,
+      timestamp: condition.timestamp,
+    }));
+  }, [conditions, loaded, readings]);
+  const cardCountRef = useRef(cards.length);
+  cardCountRef.current = cards.length;
+  const cardKeys = cards.map((card) => card.key).join("|");
+
+  const stopAutoPlay = () => {
+    if (autoPlayTimer.current) {
+      clearInterval(autoPlayTimer.current);
+      autoPlayTimer.current = null;
+    }
+  };
+
+  animateSwipeRef.current = (direction, resumeAfter = false) => {
+    Animated.timing(swipeX, { toValue: direction * 500, duration: 300, useNativeDriver: false }).start(() => {
+      setActiveIndex((current) => {
+        const count = cardCountRef.current;
+        return direction < 0 ? (current + 1) % count : (current - 1 + count) % count;
+      });
+      swipeX.setValue(0);
+      swipeY.setValue(0);
+      if (resumeAfter) scheduleAutoPlayRef.current();
+    });
+  };
+
+  scheduleAutoPlayRef.current = () => {
+    stopAutoPlay();
+    if (cardCountRef.current > 1) {
+      autoPlayTimer.current = setInterval(() => animateSwipeRef.current(-1), 4000);
+    }
+  };
+
+  useEffect(() => {
+    setActiveIndex(0);
+    swipeX.setValue(0);
+    swipeY.setValue(0);
+    scheduleAutoPlayRef.current();
+    return stopAutoPlay;
+  }, [cardKeys, swipeX, swipeY]);
+
+  const panResponder = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gesture) => cardCountRef.current > 1 && Math.abs(gesture.dx) > 8,
+    onPanResponderGrant: stopAutoPlay,
+    onPanResponderMove: (_, gesture) => {
+      swipeX.setValue(gesture.dx);
+      swipeY.setValue(gesture.dy * 0.08);
+    },
+    onPanResponderRelease: (_, gesture) => {
+      if (Math.abs(gesture.dx) > 70 || Math.abs(gesture.vx) > 0.5) {
+        const direction = gesture.dx > 0 ? 1 : -1;
+        animateSwipeRef.current(direction, true);
+      } else {
+        Animated.parallel([
+          Animated.spring(swipeX, { toValue: 0, friction: 7, tension: 120, useNativeDriver: false }),
+          Animated.spring(swipeY, { toValue: 0, friction: 7, tension: 120, useNativeDriver: false }),
+        ]).start(() => scheduleAutoPlayRef.current());
+      }
+    },
+  })).current;
+
+  const rotate = swipeX.interpolate({ inputRange: [-200, 0, 200], outputRange: ["-8deg", "0deg", "8deg"] });
+
   return (
-    <View style={styles.rainIcon}>
-      <MaterialIcons name="cloud" size={41} color={colors.blue} />
-      <View style={styles.rainDrops}>
-        <View style={styles.drop} />
-        <View style={[styles.drop, styles.dropMiddle]} />
-        <View style={styles.drop} />
+    <View style={cardDeckStyles.wrapper}>
+      <View style={cardDeckStyles.container}>
+        {cards.map((card, cardIndex) => {
+          const offset = ((cardIndex - activeIndex) % cards.length + cards.length) % cards.length;
+          const isTop = offset === 0;
+          const isVisible = offset <= 2;
+          const palette = SEVERITY_COLORS[card.severity];
+          const animatedStyle = isTop
+            ? { transform: [{ translateX: swipeX }, { translateY: swipeY }, { rotate }], zIndex: 10, elevation: 10 }
+            : { transform: [{ translateX: offset * 12 }, { scale: 1 - offset * 0.06 }], zIndex: 10 - offset, elevation: 10 - offset };
+
+          return (
+            <Animated.View
+              key={card.key}
+              style={[cardDeckStyles.card, animatedStyle, { opacity: isVisible ? 1 : 0 }]}
+              {...(isTop && cards.length > 1 ? panResponder.panHandlers : {})}
+            >
+              <View style={cardDeckStyles.cardRow}>
+                <View style={[cardDeckStyles.iconCircle, { backgroundColor: palette.pale }]}>
+                  <MaterialIcons name={card.icon} size={21} color={palette.accent} />
+                </View>
+                <View style={cardDeckStyles.cardCopy}>
+                  <Text style={cardDeckStyles.sensorLabel} numberOfLines={1}>{card.title}</Text>
+                  <Text style={cardDeckStyles.message} numberOfLines={2}>{card.message}</Text>
+                  <View style={cardDeckStyles.metaRow}>
+                    {card.timestamp && <Text style={cardDeckStyles.updated}>Updated: {formatConditionTime(card.timestamp)}</Text>}
+                    <View style={[cardDeckStyles.statusBadge, { backgroundColor: palette.pale }]}>
+                      <View style={[cardDeckStyles.statusDot, { backgroundColor: palette.accent }]} />
+                      <Text style={[cardDeckStyles.statusText, { color: palette.accent }]}>
+                        {card.severity === "normal" ? "Normal" : card.severity === "danger" ? "Alert" : "Caution"}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </Animated.View>
+          );
+        })}
       </View>
+      {cards.length > 1 && (
+        <View style={cardDeckStyles.dotsRow}>
+          {cards.map((card, index) => <View key={card.key} style={[cardDeckStyles.dot, index === activeIndex && cardDeckStyles.dotActive]} />)}
+        </View>
+      )}
     </View>
   );
 }
 
+const cardDeckStyles = StyleSheet.create({
+  wrapper: { marginBottom: 12 },
+  container: { height: 100, alignItems: "center" },
+  card: { position: "absolute", width: "92%", right: 18, height: 90, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: "#FFFFFF", paddingHorizontal: 16, paddingVertical: 13, shadowColor: "#0B1C1C", shadowOpacity: 0.07, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, justifyContent: "center" },
+  cardRow: { flexDirection: "row", alignItems: "center" },
+  iconCircle: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  cardCopy: { flex: 1, marginLeft: 12 },
+  sensorLabel: { fontSize: 10, fontWeight: "800", color: colors.muted, textTransform: "uppercase", letterSpacing: 0.5 },
+  message: { fontSize: 13, fontWeight: "700", color: colors.ink, lineHeight: 17, marginTop: 1 },
+  metaRow: { minHeight: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 2 },
+  updated: { fontSize: 9, fontWeight: "600", color: colors.muted },
+  statusBadge: { flexDirection: "row", alignItems: "center", borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2 },
+  statusDot: { width: 5, height: 5, borderRadius: 3, marginRight: 4 },
+  statusText: { fontSize: 9, fontWeight: "700" },
+  dotsRow: { flexDirection: "row", justifyContent: "center", gap: 6, marginTop: 6 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#CBD5E1" },
+  dotActive: { width: 18, backgroundColor: colors.green },
+});
 function HeaderBirds() {
   return (
     <View pointerEvents="none" style={styles.birds}>
@@ -112,6 +308,8 @@ export default function DashboardScreen() {
   const [displayName, setDisplayName] = useState(firebaseAuth.currentUser?.displayName?.trim() || "Juan Dela Cruz");
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [announcementsLoaded, setAnnouncementsLoaded] = useState(false);
+  const [sensorReadings, setSensorReadings] = useState<Record<string, SensorReading | null>>({});
+  const [loadedSensors, setLoadedSensors] = useState<Record<string, boolean>>({});
   const sectionAnimations = useRef(
     Array.from({ length: 5 }, () => ({ opacity: new Animated.Value(0), y: new Animated.Value(14) })),
   ).current;
@@ -122,6 +320,24 @@ export default function DashboardScreen() {
     });
 
     return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const unsubscribes = SENSORS.map((sensor) =>
+      subscribeToSensor(
+        sensor.id,
+        (reading) => {
+          const receivedAt = Date.now();
+          setSensorReadings((prev) => ({
+            ...prev,
+            [sensor.id]: reading && typeof reading === "object" ? { ...reading, receivedAt } : null,
+          }));
+          setLoadedSensors((prev) => ({ ...prev, [sensor.id]: true }));
+        },
+        () => {},
+      )
+    );
+    return () => unsubscribes.forEach((unsub) => unsub());
   }, []);
 
   useEffect(() => subscribeToAnnouncements(
@@ -194,13 +410,7 @@ export default function DashboardScreen() {
           </Animated.View>
 
           <Animated.View style={{ opacity: sectionAnimations[1].opacity, transform: [{ translateY: sectionAnimations[1].y }] }}>
-            <View style={styles.conditionCard}>
-              <RainIcon />
-              <View style={styles.conditionCopy}>
-                <Text style={styles.conditionTitle}>Rainy conditions</Text>
-                <Text style={styles.conditionBody}>It has been raining in your area.</Text>
-              </View>
-            </View>
+            <SensorCardDeck readings={sensorReadings} loaded={SENSORS.every((sensor) => loadedSensors[sensor.id])} />
           </Animated.View>
 
           <Animated.View style={{ opacity: sectionAnimations[2].opacity, transform: [{ translateY: sectionAnimations[2].y }] }}>

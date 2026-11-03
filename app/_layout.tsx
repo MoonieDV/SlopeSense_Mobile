@@ -100,7 +100,15 @@ export default function RootLayout() {
       if (response.notification.request.content.data?.route !== "/alerts-announcements") return;
 
       openedNotificationId = response.notification.request.identifier;
-      router.push("/alerts-announcements" as never);
+      const data = response.notification.request.content.data;
+      router.push({ pathname: "/alerts-announcements", params: {
+        eventId: typeof data.eventId === "string" ? data.eventId : "",
+        announcementId: typeof data.announcementId === "string" ? data.announcementId : "",
+        payload: JSON.stringify({ title: response.notification.request.content.title || data.title,
+          body: response.notification.request.content.body || data.body, category: data.category,
+          classification: data.classification, severity: data.severity, timestamp: data.timestamp }),
+      } } as never);
+      void Notifications.clearLastNotificationResponseAsync();
     };
 
     const subscription = Notifications.addNotificationResponseReceivedListener(openNotificationRoute);

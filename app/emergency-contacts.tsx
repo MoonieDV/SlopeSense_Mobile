@@ -1,7 +1,7 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
-import { Animated, Image, Pressable, ScrollView, StyleSheet, Text, View, Modal, TextInput, Linking } from "react-native";
+import { Animated, Image, Pressable, ScrollView, StyleSheet, Text, View, Modal, TextInput, Linking, BackHandler } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { ref, push, onValue, update, remove } from "firebase/database";
 
@@ -70,6 +70,7 @@ const initialLocalNumbers: LocalNumber[] = [
 
 export default function EmergencyContactsScreen() {
   const router = useRouter();
+  useEffect(() => { const sub = BackHandler.addEventListener('hardwareBackPress', () => { router.replace('/guide' as any); return true; }); return () => sub.remove(); }, [router]);
   const entranceStyle = useScreenEntrance();
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -608,4 +609,9 @@ const styles = StyleSheet.create({
 
   pressed: { opacity: 0.7 },
 });
+
+
+
+
+
 

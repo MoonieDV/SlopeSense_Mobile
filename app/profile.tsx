@@ -2,12 +2,13 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { type RelativePathString, useRouter } from "expo-router";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useEffect, useState } from "react";
-import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { firebaseAuth } from "@/lib/firebase";
 import { getUserProfile } from "@/lib/firebase-auth";
+import { getLocalProfilePhoto } from "@/lib/local-profile-photo";
 import { useScreenEntrance } from "@/hooks/use-screen-entrance";
 
 const colors = { green: "#006B3C", deepGreen: "#004F2D", ink: "#111827", muted: "#5F6368", border: "#E1E5E7", paleGreen: "#EAF6ED" };
@@ -22,18 +23,20 @@ export default function ProfileScreen() {
   const router = useRouter();
   const entranceStyle = useScreenEntrance();
   const [message, setMessage] = useState("");
-  const [profile, setProfile] = useState({ displayName: "Resident", email: "", phone: "", address: "" });
+  const [profile, setProfile] = useState({ displayName: "Resident", email: "", phone: "", address: "", photoURL: "" });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
       if (!user) return;
 
       const storedProfile = await getUserProfile(user.uid);
+      const localPhoto = await getLocalProfilePhoto(user.uid);
       setProfile({
         displayName: user.displayName?.trim() || storedProfile?.displayName?.trim() || "Resident",
         email: user.email || storedProfile?.email || "",
         phone: storedProfile?.phone || "",
         address: storedProfile?.address || "",
+        photoURL: localPhoto || user.photoURL || storedProfile?.photoURL || "",
       });
     });
 
@@ -58,9 +61,9 @@ export default function ProfileScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           <Animated.View style={entranceStyle}>
             <View style={styles.identityBlock}>
-              <View style={styles.avatar}><MaterialIcons name="person" size={54} color={colors.green} /></View>
+              <View style={styles.avatar}>{profile.photoURL ? <Image source={{ uri: profile.photoURL }} style={styles.avatarImage} /> : <MaterialIcons name="person" size={54} color={colors.green} />}</View>
               <View style={styles.identityCopy}><Text style={styles.name}>{profile.displayName}</Text><Text style={styles.role}>Resident</Text><Text style={styles.memberSince}>Member since {firebaseAuth.currentUser?.metadata.creationTime ? new Date(firebaseAuth.currentUser.metadata.creationTime).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : "recently"}</Text></View>
-              <Pressable style={styles.cameraButton} accessibilityRole="button" accessibilityLabel="Change profile photo"><MaterialIcons name="camera-alt" size={15} color="#FFFFFF" /></Pressable>
+              <Pressable onPress={() => router.push("/edit-profile" as RelativePathString)} style={styles.cameraButton} accessibilityRole="button" accessibilityLabel="Change profile photo"><MaterialIcons name="camera-alt" size={15} color="#FFFFFF" /></Pressable>
             </View>
             <Text style={styles.sectionTitle}>Personal Information</Text>
             <View style={styles.group}>
@@ -71,7 +74,7 @@ export default function ProfileScreen() {
             <Text style={styles.sectionTitle}>Account</Text>
             <View style={styles.group}>
               <ProfileRow icon="person-outline" label="Edit Profile" onPress={() => router.push("/edit-profile" as RelativePathString)} />
-              <ProfileRow icon="lock-outline" label="Change Password" onPress={() => setMessage("Password settings will be connected next.")} />
+              <ProfileRow icon="lock-outline" label="Change Password" onPress={() => router.push("/change-password" as RelativePathString)} />
               <ProfileRow icon="logout" label="Logout" destructive onPress={logout} />
             </View>
             {!!message && <Text style={styles.message}>{message}</Text>}
@@ -88,7 +91,8 @@ const styles = StyleSheet.create({
   headerTitle: { color: "#FFFFFF", fontSize: 15, fontWeight: "800" },
   scrollContent: { paddingBottom: 92 },
   identityBlock: { minHeight: 112, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderBottomColor: "#EDF0F1" },
-  avatar: { width: 70, height: 70, borderRadius: 35, backgroundColor: colors.paleGreen, alignItems: "center", justifyContent: "center" },
+  avatar: { width: 70, height: 70, borderRadius: 35, overflow: "hidden", backgroundColor: colors.paleGreen, alignItems: "center", justifyContent: "center" },
+  avatarImage: { width: "100%", height: "100%" },
   identityCopy: { flex: 1, marginLeft: 16 },
   name: { color: colors.ink, fontSize: 17, fontWeight: "800" },
   role: { color: colors.green, fontSize: 12, fontWeight: "700", marginTop: 5 },
